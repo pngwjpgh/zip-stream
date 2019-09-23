@@ -10,6 +10,8 @@ import           Data.Time.LocalTime (LocalTime)
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
 
+import           Data.Semigroup as Semigroup
+
 -- |Errors thrown during zip file processing
 newtype ZipError = ZipError String
   deriving (Show, Typeable)
@@ -39,10 +41,13 @@ data ZipData m
   = ZipDataByteString BSL.ByteString -- ^A known ByteString, which will be fully evaluated (not streamed)
   | ZipDataSource (C.Source m ByteString) -- ^A byte stream producer, streamed (and compressed) directly into the zip
 
+instance Monad m => Semigroup.Semigroup (ZipData m) where
+  ZipDataByteString a <> ZipDataByteString b = ZipDataByteString $ a <> b
+  a <> b = ZipDataSource $ sourceZipData a <> sourceZipData b
+
 instance Monad m => Monoid (ZipData m) where
   mempty = ZipDataByteString BSL.empty
-  mappend (ZipDataByteString a) (ZipDataByteString b) = ZipDataByteString $ mappend a b
-  mappend a b = ZipDataSource $ mappend (sourceZipData a) (sourceZipData b)
+  mappend = (<>)
 
 -- |Normalize any 'ZipData' to a simple source
 sourceZipData :: Monad m => ZipData m -> C.Source m ByteString

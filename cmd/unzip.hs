@@ -17,11 +17,12 @@ import           System.Environment (getProgName, getArgs)
 import           System.Exit (exitFailure)
 import           System.FilePath.Posix (takeDirectory) -- zip files only use forward slashes
 import           System.IO (stdin, openFile, IOMode(WriteMode), hClose, hSetFileSize, hPutStrLn, stderr)
+import           Data.Void (Void)
 
 import           Codec.Archive.Zip.Conduit.UnZip
 import           Codec.Archive.Zip.Conduit.Encoding
 
-extract :: C.Sink (Either ZipEntry BS.ByteString) IO ()
+extract :: C.ConduitM (Either ZipEntry BS.ByteString) Void IO ()
 extract = C.awaitForever start where
   start (Left e@ZipEntry{..}) = do
     name <- dropWhile ('/' ==) <$> decodeZipEntryName e

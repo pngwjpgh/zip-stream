@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Codec.Archive.Zip.Conduit.Internal
   ( osVersion, zipVersion
   , zipError
@@ -49,6 +51,17 @@ sizeC = passthroughFold (\l b -> l + fromIntegral (BS.length b)) 0 -- fst <$> si
 outputSize :: Monad m => C.Conduit i m BS.ByteString -> C.ConduitM i BS.ByteString m Word64
 outputSize = (C..| sizeC)
 
+#if MIN_VERSION_conduit(1,3,0)
+inputSize :: Monad m => C.Conduit BS.ByteString m o -> C.ConduitT BS.ByteString o m Word64
+-- inputSize = fuseUpstream sizeC -- won't work because we need to deal with leftovers properly
+inputSize (CI.ConduitT src) = CI.ConduitT $ \rest -> let
+  go n (CI.Done ()) = rest n
+  go n (CI.PipeM m) = CI.PipeM $ go n <$> m
+  go n (CI.Leftover p b) = CI.Leftover (go (n - fromIntegral (BS.length b)) p) b
+  go n (CI.HaveOutput p o) = CI.HaveOutput (go n p) o
+  go n (CI.NeedInput p q) = CI.NeedInput (\b -> go (n + fromIntegral (BS.length b)) (p b)) (go n . q)
+  in go 0 (src CI.Done)
+#else
 inputSize :: Monad m => C.Conduit BS.ByteString m o -> C.ConduitM BS.ByteString o m Word64
 -- inputSize = fuseUpstream sizeC -- won't work because we need to deal with leftovers properly
 inputSize (CI.ConduitM src) = CI.ConduitM $ \rest -> let
@@ -58,6 +71,7 @@ inputSize (CI.ConduitM src) = CI.ConduitM $ \rest -> let
   go n (CI.HaveOutput p f o) = CI.HaveOutput (go n p) f o
   go n (CI.NeedInput p q) = CI.NeedInput (\b -> go (n + fromIntegral (BS.length b)) (p b)) (go n . q)
   in go 0 (src CI.Done)
+#endif
 
 maxBound32 :: Integral n => n
 maxBound32 = fromIntegral (maxBound :: Word32)

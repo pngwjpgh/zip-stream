@@ -1,6 +1,7 @@
-resolver: lts-9.9
+resolver: lts-14.6
 packages:
   - '.'
 extra-deps:
-  - regex-compat-0.93.1
-  - encoding-0.8.2
+  - git: https://github.com/uni2work/encoding.git
+    commit: 00270d4bc7973b7b4a04766200073bcd946c5d2d
+  - HaXml-1.25.5

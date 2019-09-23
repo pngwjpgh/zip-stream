@@ -9,7 +9,9 @@ import           Data.List (foldl')
 import           Data.Time.LocalTime (utcToLocalTime, utc)
 import qualified System.Console.GetOpt as Opt
 import           System.Directory (doesDirectoryExist, getModificationTime
-#if MIN_VERSION_directory(1,2,6)
+#if MIN_VERSION_directory(1,3,0)
+  , pathIsSymbolicLink, listDirectory
+#elif MIN_VERSION_directory(1,2,6)
   , isSymbolicLink, listDirectory
 #else
   , getDirectoryContents
@@ -35,7 +37,7 @@ opts =
     "set zip comment"
   ]
 
-generate :: (MonadIO m, MonadResource m, MonadThrow m) => [FilePath] -> C.Source m (ZipEntry, ZipData m)
+generate :: (MonadIO m, MonadResource m, MonadThrow m) => [FilePath] -> C.ConduitM () (ZipEntry, ZipData m) m ()
 generate (p:paths) = do
   t <- liftIO $ getModificationTime p
   -- FIXME: timezone
@@ -43,7 +45,9 @@ generate (p:paths) = do
   isd <- liftIO $ doesDirectoryExist p
   if isd
     then do
-#if MIN_VERSION_directory(1,2,6)
+#if MIN_VERSION_directory(1,3,0)
+      dl <- liftIO $ filterM (fmap not . pathIsSymbolicLink) . map (p </>) =<< listDirectory p
+#elif MIN_VERSION_directory(1,2,6)
       dl <- liftIO $ filterM (fmap not . isSymbolicLink) . map (p </>) =<< listDirectory p
 #else
       dl <- liftIO $ filter (`notElem` [".",".."]) . map (p </>) <$> getDirectoryContents p
